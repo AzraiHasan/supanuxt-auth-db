@@ -17,48 +17,40 @@
         <h1 class="text-2xl font-bold mb-4">Set New Password</h1>
         <p class="mb-4 text-gray-600">Enter your new password below.</p>
 
-        <UForm :state="state" @submit="updatePassword" :validate="validate">
-          <UFormGroup label="New Password" name="password">
-            <UInput v-model="state.password" type="password" autocomplete="new-password" />
-          </UFormGroup>
+        <form @submit.prevent="updatePassword">
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">New Password</label>
+            <UInput v-model="password" type="password" autocomplete="new-password" />
+            <p v-if="passwordError" class="mt-1 text-sm text-red-500">{{ passwordError }}</p>
+          </div>
 
-          <UFormGroup label="Confirm New Password" name="confirmPassword">
-            <UInput v-model="state.confirmPassword" type="password" autocomplete="new-password" />
-          </UFormGroup>
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Confirm New Password</label>
+            <UInput v-model="confirmPassword" type="password" autocomplete="new-password" />
+            <p v-if="confirmPasswordError" class="mt-1 text-sm text-red-500">{{ confirmPasswordError }}</p>
+          </div>
 
           <div class="mt-4">
             <UButton type="submit" block :loading="loading">Update Password</UButton>
           </div>
-        </UForm>
+        </form>
       </template>
     </UCard>
   </div>
 </template>
 
 <script setup lang="ts">
-interface PasswordFormState {
-  password: string;
-  confirmPassword: string;
-}
-
 const supabase = useSupabaseClient()
-const state = ref<PasswordFormState>({ password: '', confirmPassword: '' })
 const toast = useToast()
+const router = useRouter()
+
+const password = ref('')
+const confirmPassword = ref('')
+const passwordError = ref('')
+const confirmPasswordError = ref('')
 const loading = ref(false)
 const authError = ref<string | null>(null)
 const processingToken = ref(true)
-
-const validate = (state: PasswordFormState) => {
-  const errors: Record<string, string> = {}
-  
-  if (!state.password) errors.password = 'Password is required'
-  else if (state.password.length < 6) errors.password = 'Password must be at least 6 characters'
-  
-  if (!state.confirmPassword) errors.confirmPassword = 'Please confirm your password'
-  else if (state.confirmPassword !== state.password) errors.confirmPassword = 'Passwords do not match'
-  
-  return errors
-}
 
 // Process recovery token on mount
 onMounted(async () => {
@@ -101,18 +93,53 @@ onMounted(async () => {
   }
 })
 
+function validateForm() {
+  let isValid = true
+  passwordError.value = ''
+  confirmPasswordError.value = ''
+  
+  if (!password.value) {
+    passwordError.value = 'Password is required'
+    isValid = false
+  } else if (password.value.length < 6) {
+    passwordError.value = 'Password must be at least 6 characters'
+    isValid = false
+  }
+  
+  if (!confirmPassword.value) {
+    confirmPasswordError.value = 'Please confirm your password'
+    isValid = false
+  } else if (confirmPassword.value !== password.value) {
+    confirmPasswordError.value = 'Passwords do not match'
+    isValid = false
+  }
+  
+  return isValid
+}
+
 async function updatePassword() {
+  if (!validateForm()) return
+  
   loading.value = true
   try {
     console.log('Updating password...')
+    
+    // Get the current session to ensure we have a valid token
+    const { data: sessionData } = await supabase.auth.getSession()
+    
+    if (!sessionData.session) {
+      throw new Error('No active session. Please use a valid reset link.')
+    }
+    
     const { data, error } = await supabase.auth.updateUser({
-      password: state.password
+      password: password.value
     })
     
     console.log('Update result:', { success: !!data.user, error })
 
     if (error) throw error
 
+    // Explicitly show the toast message
     toast.add({
       title: 'Success',
       description: 'Your password has been updated successfully.',
@@ -122,9 +149,9 @@ async function updatePassword() {
     // Clear hash parameters
     window.history.replaceState(null, '', window.location.pathname)
     
-    // Redirect to login
+    // Wait a moment so the user can see the success message
     setTimeout(() => {
-      navigateTo('/login')
+      router.push('/login')
     }, 1500)
   } catch (error: any) {
     console.error('Password update error:', error)
