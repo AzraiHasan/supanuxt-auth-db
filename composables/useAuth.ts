@@ -5,6 +5,14 @@ interface AuthState {
   confirmPassword?: string;
 }
 
+interface ProfileData {
+  id: string;
+  full_name?: string;
+  username?: string;
+  website?: string;
+  avatar_url?: string | null;
+}
+
 interface AuthResponse {
   success: boolean;
   error?: Error;

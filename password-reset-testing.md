@@ -44,6 +44,7 @@ This document outlines the steps to test the password reset functionality in our
 - Verify redirection to the `/update-password` page
 - Confirm the password update form loads correctly
 - Verify the session token is properly processed from URL hash (check console logs)
+- Look for "Session established: success: true" in the console logs
 
 ### Step 2: Submit New Password
 - Enter a new password in the "New Password" field
@@ -58,9 +59,8 @@ This document outlines the steps to test the password reset functionality in our
 - Enter your email address
 - Enter the newly created password
 - Click "Sign In"
-- Check console logs for login request/response
-- Verify successful authentication
-- Confirm redirection to the dashboard (`/dashboard`)
+- Check console logs for "Login successful, redirecting to dashboard"
+- Verify successful authentication and redirection to dashboard
 
 ## Form Validation Testing
 
@@ -76,6 +76,73 @@ Test the following validation scenarios:
 - Submit with non-matching confirmation → Error: "Passwords do not match"
 - Submit with empty confirmation → Error: "Please confirm your password"
 
+## Security Testing Results
+
+All security consideration tests have been completed successfully:
+
+### 1. Protected Route Access ✅
+- Unauthenticated users are properly redirected to login page when attempting to access protected routes
+- No protected content is momentarily visible during redirection
+
+### 2. Token Expiration ✅
+- Password reset tokens properly expire after successful use
+- Attempting to reuse a consumed token is rejected with appropriate error message
+
+### 3. Invalid Token Handling ✅
+- Modified or tampered tokens are properly rejected
+- System prevents unauthorized password changes
+
+### 4. Error Messages ✅
+- Error messages are informative but do not expose implementation details
+- Users are properly guided to request new links when tokens are invalid/expired
+- Consistent error handling across different failure scenarios
+
+### 5. Sensitive Information Protection ✅
+- No sensitive data (passwords, tokens) appears in console logs
+- Authentication tokens are properly masked in network requests
+- Internal error structures are not exposed in browser console
+
+## Known Issues and Solutions
+
+### Form Validation Errors
+When using UForm with custom validation, you may encounter these errors:
+- `TypeError: (intermediate value).filter is not a function`
+- `TypeError: formErrors?.value?.find is not a function`
+
+**Solution:** Replace UForm with a standard form and implement manual validation:
+```vue
+<form @submit.prevent="updatePassword">
+  <div class="mb-4">
+    <label class="block text-sm font-medium mb-1">New Password</label>
+    <UInput v-model="password" type="password" autocomplete="new-password" />
+    <p v-if="passwordError" class="mt-1 text-sm text-red-500">{{ passwordError }}</p>
+  </div>
+  <!-- Other form elements -->
+</form>
+```
+
+### Session Handling Issues
+If password update succeeds in UI but fails during login:
+
+**Solution:** Verify active session before updating password:
+```typescript
+// Get the current session to ensure we have a valid token
+const { data: sessionData } = await supabase.auth.getSession()
+    
+if (!sessionData.session) {
+  throw new Error('No active session. Please use a valid reset link.')
+}
+```
+
+### Router Navigation Warnings
+If you see warnings about `history.replaceState`:
+
+**Solution:** Use router navigation instead:
+```typescript
+// Instead of window.history.replaceState
+router.push('/login')
+```
+
 ## Troubleshooting
 
 ### Reset Emails Not Sending
@@ -86,28 +153,21 @@ Test the following validation scenarios:
 
 ### Password Update Failures
 - Check browser console for token processing errors
-- Inspect URL parameters for proper token inclusion
-- Verify console logs indicating successful session establishment
-- Check for detailed error messages in the console
+- Look for "Session established: success: true" in console logs
+- Verify token successful extraction from URL hash
+- Ensure password meets requirements (min 6 characters)
+- Check that password and confirmation match
 
 ### Login Failures After Password Reset
 - Check browser console for detailed login request/response logs
-- Verify that the password was successfully updated (check logs)
-- Ensure there are no validation errors in the login form
+- Verify update result shows `{success: true, error: null}`
+- Check Supabase Auth logs for successful password update
 - Try clearing browser cache and cookies if issues persist
 
-### Redirect Issues
-- Ensure the `redirectTo` URL in the reset password request is correctly formatted
-- Make sure Supabase's auto-redirection is properly configured in nuxt.config.ts
-- Verify that the update-password page correctly processes URL hash parameters
-- Check that the exclude list in nuxt.config.ts includes all necessary paths:
-  ```typescript
-  supabase: {
-    redirectOptions: {
-      exclude: ['/', '/reset-password', '/update-password'],
-    }
-  }
-  ```
+### Dual Password Reset Pages
+The application has both `/update-password.vue` and `/recovery.vue` pages:
+- `/update-password.vue` is the primary implementation used with redirect URLs
+- Test both if needed, but focus on `/update-password.vue` for consistency
 
 ## Manual Testing Without Email (Development Only)
 

@@ -6,7 +6,7 @@
     <NuxtLink to="/" class="font-bold text-xl">My App</NuxtLink>
     <nav>
      <template v-if="user">
-      <UButton variant="ghost" @click="logout">Logout</UButton>
+      <UserMenu />
      </template>
      <template v-else>
       <UButton to="/login" variant="ghost">Login</UButton>
