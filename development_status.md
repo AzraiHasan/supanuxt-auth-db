@@ -22,8 +22,8 @@
 - Implement auth pages ⏳
   - Sign up page with email/password form ✅
   - Login page with email/password form ✅
-  - Password reset request page
-  - Password reset confirmation page
+  - Password reset request page ✅
+  - Password reset confirmation page ✅
   - Email verification page ✅ (confirm.vue)
   - OAuth provider buttons (if applicable)
 

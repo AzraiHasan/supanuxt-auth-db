@@ -7,7 +7,7 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/login',
       callback: '/confirm',
-      exclude: ['/'],
+      exclude: ['/', '/reset-password', '/update-password'],
     }
   }
 })

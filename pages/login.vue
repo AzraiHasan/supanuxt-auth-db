@@ -2,6 +2,7 @@
 <template>
  <div class="flex min-h-screen justify-center items-center">
   <UCard class="w-full max-w-md">
+
    <UForm :state="state" @submit="onLogin" :validate="validate">
     <h1 class="text-2xl font-bold mb-4">Sign In</h1>
 
@@ -16,13 +17,19 @@
     <div class="mt-4">
      <UButton type="submit" block :loading="loading">Sign In</UButton>
     </div>
-
-    <div class="mt-4 text-center">
-     <p>Don't have an account? <NuxtLink to="/register" class="text-primary">Register</NuxtLink>
-     </p>
-    </div>
    </UForm>
+
+   <div class="mt-4 text-center">
+    <div>Don't have an account? <NuxtLink to="/register">
+      <UButton color="primary" variant="link" class="text-primary">Register</UButton>
+     </NuxtLink>
+    </div>
+    <div class="mt-2">
+     <UButton variant="link" class="text-sm" to="/reset-password">Forgot your password?</UButton>
+    </div>
+   </div>
   </UCard>
+
  </div>
 </template>
 
