@@ -6,39 +6,64 @@
         {{ authError }}
       </div>
 
-      <h1 class="text-2xl font-bold mb-4">Set New Password</h1>
-      <p class="mb-4 text-gray-600">Enter your new password below.</p>
+      <template v-if="processingToken">
+        <div class="text-center">
+          <UIcon name="i-heroicons-arrow-path" class="animate-spin text-3xl mb-4" />
+          <p>Processing your reset token...</p>
+        </div>
+      </template>
 
-      <div class="mb-4">
-        <label class="block text-sm font-medium mb-1">New Password</label>
-        <UInput v-model="password" type="password" autocomplete="new-password" />
-      </div>
+      <template v-else>
+        <h1 class="text-2xl font-bold mb-4">Set New Password</h1>
+        <p class="mb-4 text-gray-600">Enter your new password below.</p>
 
-      <div class="mb-4">
-        <label class="block text-sm font-medium mb-1">Confirm New Password</label>
-        <UInput v-model="confirmPassword" type="password" autocomplete="new-password" />
-      </div>
+        <UForm :state="state" @submit="updatePassword" :validate="validate">
+          <UFormGroup label="New Password" name="password">
+            <UInput v-model="state.password" type="password" autocomplete="new-password" />
+          </UFormGroup>
 
-      <div class="mt-4">
-        <UButton @click="updatePassword" block :loading="loading">Update Password</UButton>
-      </div>
+          <UFormGroup label="Confirm New Password" name="confirmPassword">
+            <UInput v-model="state.confirmPassword" type="password" autocomplete="new-password" />
+          </UFormGroup>
+
+          <div class="mt-4">
+            <UButton type="submit" block :loading="loading">Update Password</UButton>
+          </div>
+        </UForm>
+      </template>
     </UCard>
   </div>
 </template>
 
 <script setup lang="ts">
+interface PasswordFormState {
+  password: string;
+  confirmPassword: string;
+}
+
 const supabase = useSupabaseClient()
-const password = ref('')
-const confirmPassword = ref('')
+const state = ref<PasswordFormState>({ password: '', confirmPassword: '' })
 const toast = useToast()
 const loading = ref(false)
 const authError = ref<string | null>(null)
 const processingToken = ref(true)
 
+const validate = (state: PasswordFormState) => {
+  const errors: Record<string, string> = {}
+  
+  if (!state.password) errors.password = 'Password is required'
+  else if (state.password.length < 6) errors.password = 'Password must be at least 6 characters'
+  
+  if (!state.confirmPassword) errors.confirmPassword = 'Please confirm your password'
+  else if (state.confirmPassword !== state.password) errors.confirmPassword = 'Passwords do not match'
+  
+  return errors
+}
+
 // Process recovery token on mount
 onMounted(async () => {
   try {
-    // We need to process the token from the URL hash
+    // Process the token from the URL hash
     console.log('Processing URL parameters...')
     
     // Get hash parameters from URL
@@ -77,27 +102,11 @@ onMounted(async () => {
 })
 
 async function updatePassword() {
-  // Validation
-  if (!password.value) {
-    toast.add({ title: 'Error', description: 'Password is required', color: 'red' })
-    return
-  }
-  
-  if (password.value.length < 6) {
-    toast.add({ title: 'Error', description: 'Password must be at least 6 characters', color: 'red' })
-    return
-  }
-  
-  if (password.value !== confirmPassword.value) {
-    toast.add({ title: 'Error', description: 'Passwords do not match', color: 'red' })
-    return
-  }
-
   loading.value = true
   try {
     console.log('Updating password...')
     const { data, error } = await supabase.auth.updateUser({
-      password: password.value
+      password: state.password
     })
     
     console.log('Update result:', { success: !!data.user, error })
@@ -110,6 +119,9 @@ async function updatePassword() {
       color: 'green'
     })
 
+    // Clear hash parameters
+    window.history.replaceState(null, '', window.location.pathname)
+    
     // Redirect to login
     setTimeout(() => {
       navigateTo('/login')

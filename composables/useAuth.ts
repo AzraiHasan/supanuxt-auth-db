@@ -19,24 +19,33 @@ export const useAuth = () => {
   const error: Ref<string | null> = ref(null)
 
   // Login with email/password
-  const login = async (email: string, password: string): Promise<AuthResponse> => {
+    const login = async (email: string, password: string): Promise<AuthResponse> => {
     loading.value = true
     error.value = null
     
     try {
-      const { error: authError } = await client.auth.signInWithPassword({
+      console.log('Attempting to sign in with:', { email, password: '******' })
+      
+      const { data, error: authError } = await client.auth.signInWithPassword({
         email,
         password
+      })
+
+      console.log('Sign in response:', { 
+        success: !!data?.session, 
+        hasError: !!authError, 
+        errorMessage: authError?.message
       })
 
       if (authError) throw authError
       
       return { success: true }
     } catch (err: any) {
-      error.value = err.message
+      console.error('Login error:', err)
+      error.value = err.message || 'An error occurred during login'
       toast.add({
-        title: 'Error',
-        description: err.message,
+        title: 'Login Failed',
+        description: err.message || 'An error occurred during login',
         color: 'red'
       })
       return { success: false, error: err }
@@ -114,11 +123,20 @@ export const useAuth = () => {
     error.value = null
     
     try {
-      const { error: authError } = await client.auth.updateUser({
+      const { data, error: authError } = await client.auth.updateUser({
         password: newPassword
       })
 
+      console.log('Password update response:', { 
+        success: !!data?.user, 
+        hasError: !!authError, 
+        errorDetails: authError 
+      })
+
       if (authError) throw authError
+      
+      // After successful password update, refresh the session
+      await client.auth.refreshSession()
       
       toast.add({
         title: 'Success',
@@ -145,11 +163,15 @@ export const useAuth = () => {
     error.value = null
     
     try {
+      console.log('Attempting to sign out')
       const { error: authError } = await client.auth.signOut()
+      
       if (authError) throw authError
       
+      console.log('Sign out successful')
       return { success: true }
     } catch (err: any) {
+      console.error('Logout error:', err)
       error.value = err.message
       toast.add({
         title: 'Error',
