@@ -2,51 +2,105 @@
 <template>
   <div class="flex min-h-screen justify-center items-center">
     <UCard class="w-full max-w-md">
-      <UForm :state="state" @submit="onUpdatePassword" :validate="validate">
-        <h1 class="text-2xl font-bold mb-4">Update Password</h1>
+      <div v-if="authError" class="mb-4 p-4 bg-red-100 text-red-800 rounded">
+        {{ authError }}
+      </div>
 
-        <p class="mb-4 text-gray-600">Enter your new password below.</p>
+      <h1 class="text-2xl font-bold mb-4">Set New Password</h1>
+      <p class="mb-4 text-gray-600">Enter your new password below.</p>
 
-        <UFormGroup label="New Password" name="password">
-          <UInput v-model="state.password" type="password" />
-        </UFormGroup>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">New Password</label>
+        <UInput v-model="password" type="password" autocomplete="new-password" />
+      </div>
 
-        <UFormGroup label="Confirm New Password" name="confirmPassword">
-          <UInput v-model="state.confirmPassword" type="password" />
-        </UFormGroup>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Confirm New Password</label>
+        <UInput v-model="confirmPassword" type="password" autocomplete="new-password" />
+      </div>
 
-        <div class="mt-4">
-          <UButton type="submit" block :loading="loading">Update Password</UButton>
-        </div>
-      </UForm>
+      <div class="mt-4">
+        <UButton @click="updatePassword" block :loading="loading">Update Password</UButton>
+      </div>
     </UCard>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 const supabase = useSupabaseClient()
-const state = ref({ password: '', confirmPassword: '' })
+const password = ref('')
+const confirmPassword = ref('')
 const toast = useToast()
 const loading = ref(false)
+const authError = ref<string | null>(null)
+const processingToken = ref(true)
 
-const validate = (state) => {
-  const errors = {}
+// Process recovery token on mount
+onMounted(async () => {
+  try {
+    // We need to process the token from the URL hash
+    console.log('Processing URL parameters...')
+    
+    // Get hash parameters from URL
+    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    const type = hashParams.get('type')
+    const accessToken = hashParams.get('access_token')
+    
+    console.log('Hash params:', { type, accessToken: accessToken ? '[REDACTED]' : null })
+    
+    if (type === 'recovery' && accessToken) {
+      // We have a recovery token, set up a session
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: '',
+      })
+      
+      console.log('Session established:', { success: !!data.session, error })
+      
+      if (error) {
+        authError.value = 'Invalid recovery link: ' + error.message
+      }
+    } else {
+      // Check if we already have a session (for cases where the token was already processed)
+      const { data } = await supabase.auth.getSession()
+      
+      if (!data.session) {
+        authError.value = 'No active session. Please use a valid reset link.'
+      }
+    }
+  } catch (err: any) {
+    console.error('Recovery processing error:', err)
+    authError.value = 'Error processing recovery link: ' + (err.message || 'Unknown error')
+  } finally {
+    processingToken.value = false
+  }
+})
 
-  if (!state.password) errors.password = 'Password is required'
-  else if (state.password.length < 6) errors.password = 'Password must be at least 6 characters'
+async function updatePassword() {
+  // Validation
+  if (!password.value) {
+    toast.add({ title: 'Error', description: 'Password is required', color: 'red' })
+    return
+  }
+  
+  if (password.value.length < 6) {
+    toast.add({ title: 'Error', description: 'Password must be at least 6 characters', color: 'red' })
+    return
+  }
+  
+  if (password.value !== confirmPassword.value) {
+    toast.add({ title: 'Error', description: 'Passwords do not match', color: 'red' })
+    return
+  }
 
-  if (!state.confirmPassword) errors.confirmPassword = 'Please confirm your password'
-  else if (state.confirmPassword !== state.password) errors.confirmPassword = 'Passwords do not match'
-
-  return errors
-}
-
-async function onUpdatePassword() {
   loading.value = true
   try {
-    const { error } = await supabase.auth.updateUser({
-      password: state.password
+    console.log('Updating password...')
+    const { data, error } = await supabase.auth.updateUser({
+      password: password.value
     })
+    
+    console.log('Update result:', { success: !!data.user, error })
 
     if (error) throw error
 
@@ -56,12 +110,15 @@ async function onUpdatePassword() {
       color: 'green'
     })
 
-    // Redirect to login page after successful password update
-    navigateTo('/login')
-  } catch (error) {
+    // Redirect to login
+    setTimeout(() => {
+      navigateTo('/login')
+    }, 1500)
+  } catch (error: any) {
+    console.error('Password update error:', error)
     toast.add({
       title: 'Error',
-      description: error.message,
+      description: error.message || 'Failed to update password',
       color: 'red'
     })
   } finally {

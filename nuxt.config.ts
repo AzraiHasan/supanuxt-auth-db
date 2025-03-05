@@ -8,6 +8,12 @@ export default defineNuxtConfig({
       login: '/login',
       callback: '/confirm',
       exclude: ['/', '/reset-password', '/update-password'],
+    },
+    cookieOptions: {
+      secure: process.env.NODE_ENV === 'production'
     }
+  },
+  app: {
+    pageTransition: { name: 'page', mode: 'out-in' }
   }
 })

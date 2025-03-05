@@ -30,18 +30,22 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+interface RegisterFormState {
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
 definePageMeta({
   middleware: ['guest']
 })
 
-const supabase = useSupabaseClient()
-const state = ref({ email: '', password: '', confirmPassword: '' })
-const toast = useToast()
-const loading = ref(false)
+const state = ref<RegisterFormState>({ email: '', password: '', confirmPassword: '' })
+const { register, loading, error } = useAuth()
 
-const validate = (state) => {
-  const errors = {}
+const validate = (state: RegisterFormState) => {
+  const errors: Record<string, string> = {}
   if (!state.email) errors.email = 'Email is required'
   else if (!/^\S+@\S+\.\S+$/.test(state.email)) errors.email = 'Email is invalid'
 
@@ -55,28 +59,6 @@ const validate = (state) => {
 }
 
 async function onRegister() {
-  loading.value = true
-  try {
-    const { error } = await supabase.auth.signUp({
-      email: state.email,
-      password: state.password
-    })
-
-    if (error) throw error
-
-    toast.add({
-      title: 'Success',
-      description: 'Registration successful. Please check your email for verification.',
-      color: 'green'
-    })
-  } catch (error) {
-    toast.add({
-      title: 'Error',
-      description: error.message,
-      color: 'red'
-    })
-  } finally {
-    loading.value = false
-  }
+  await register(state.email, state.password)
 }
 </script>
