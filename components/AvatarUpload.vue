@@ -49,13 +49,41 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-// Define interface for type checking locally
-interface ProfileData {
+// Define database schema types
+interface ProfileRow {
   id: string
-  email?: string
+  email?: string | null
   avatar_url?: string | null
   created_at?: string
   updated_at?: string
+}
+
+interface ProfileInsert {
+  id: string
+  email?: string | null
+  avatar_url?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+interface ProfileUpdate {
+  id?: string
+  email?: string | null
+  avatar_url?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+interface Database {
+  public: {
+    Tables: {
+      profiles: {
+        Row: ProfileRow
+        Insert: ProfileInsert
+        Update: ProfileUpdate
+      }
+    }
+  }
 }
 
 const props = defineProps({
@@ -78,7 +106,7 @@ const uploading = ref(false)
 const deleting = ref(false)
 const showDeleteModal = ref(false)
 const toast = useToast()
-const client = useSupabaseClient()
+const client = useSupabaseClient<Database>()
 const user = useSupabaseUser()
 
 function openFileDialog() {
@@ -119,6 +147,34 @@ async function onFileSelected(event: Event) {
   uploading.value = true
   
   try {
+    // If there's an existing avatar, delete it first
+    if (props.avatarUrl) {
+      try {
+        // Extract the filename from the URL
+        const match = props.avatarUrl.match(/\/avatars\/(.+)$/) || 
+                     props.avatarUrl.match(/\/storage\/v1\/object\/public\/avatars\/(.+)$/);
+        
+        if (match && match[1]) {
+          console.log('Attempting to delete old avatar file:', match[1]);
+          
+          // Delete the old file
+          const { error: deleteError } = await client.storage
+            .from('avatars')
+            .remove([match[1]]);
+          
+          if (deleteError) {
+            console.warn('Error deleting old avatar:', deleteError);
+            // Continue with upload even if deletion fails
+          } else {
+            console.log('Old avatar file deleted successfully');
+          }
+        }
+      } catch (deleteErr) {
+        console.warn('Could not delete old avatar:', deleteErr);
+        // Continue with upload even if deletion fails
+      }
+    }
+    
     // Create a unique file path
     const fileExt = file.name.split('.').pop()
     const fileName = `${user.value?.id}-${Date.now()}.${fileExt}`
@@ -139,12 +195,12 @@ async function onFileSelected(event: Event) {
     if (!publicURL) throw new Error('Failed to get public URL')
     
     // Update profile with new avatar URL
-    const { error: updateError } = await (client
-      .from('profiles') as any)
+    const { error: updateError } = await client
+      .from('profiles')
       .update({ 
         avatar_url: publicURL.publicUrl,
         updated_at: new Date().toISOString()
-      })
+      } as ProfileUpdate)
       .eq('id', user.value?.id)
     
     if (updateError) throw updateError
@@ -207,12 +263,12 @@ async function deleteAvatar() {
     
     // Update profile
     console.log('Updating profile to remove avatar_url')
-    const { error: updateError } = await (client
-      .from('profiles') as any)
+    const { error: updateError } = await client
+      .from('profiles')
       .update({
         avatar_url: null,
         updated_at: new Date().toISOString()
-      })
+      } as ProfileUpdate)
       .eq('id', user.value?.id)
     
     if (updateError) {
@@ -245,8 +301,8 @@ async function ensureProfileExists() {
   if (!user.value?.id) throw new Error('User not authenticated')
   
   // First check if profile exists
-  const { data, error } = await (client
-    .from('profiles') as any)
+  const { data, error } = await client
+    .from('profiles')
     .select('id')
     .eq('id', user.value.id)
   
@@ -256,14 +312,14 @@ async function ensureProfileExists() {
   if (error || !data || data.length === 0) {
     console.log('Creating profile for user:', user.value.id)
     
-    const { error: insertError } = await (client
-      .from('profiles') as any)
+    const { error: insertError } = await client
+      .from('profiles')
       .insert({
         id: user.value.id,
         email: user.value.email,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      })
+      } as ProfileInsert)
     
     if (insertError) throw insertError
     

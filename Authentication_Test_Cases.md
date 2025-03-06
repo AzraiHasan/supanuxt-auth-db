@@ -48,6 +48,12 @@
 - [x] Avatar is removed when confirmed
 - [x] Profile shows default avatar/initials after deletion
 
+### Avatar Replacement
+- [x] "Change Photo" button appears when avatar exists
+- [x] Old avatar file is deleted when replaced
+- [x] New avatar displays immediately after replacement
+- [x] Profile data is updated with new avatar URL
+
 ## User Interface Component Tests
 
 ### UserAvatar Component
@@ -89,10 +95,27 @@
 - [x] Error handling for storage operations is robust
 
 ## Troubleshooting Steps
-1. Check if "avatars" bucket exists and is marked as public
-2. Verify RLS policies on storage.objects table
-3. Confirm profiles table has appropriate RLS policies
-4. Test file upload with simplified naming (no folders)
-5. Ensure profile record exists before updating avatar_url
-6. Check console logs for specific error messages
-7. Test bucket operations directly via SQL if needed
+1. ✅ Check if "avatars" bucket exists and is marked as public
+2. ✅ Verify RLS policies on storage.objects table
+3. ✅ Confirm profiles table has appropriate RLS policies
+4. ✅ Test file upload with simplified naming (no folders)
+5. ✅ Ensure profile record exists before updating avatar_url
+6. ✅ Check console logs for specific error messages
+7. ✅ Test bucket operations directly via SQL if needed
+
+## Completed Fixes
+1. ✅ Created missing "avatars" storage bucket in Supabase
+2. ✅ Set bucket to public for avatar accessibility
+3. ✅ Added proper SELECT policy for "storage.buckets" to allow read access
+4. ✅ Verified proper file path construction for avatar storage
+5. ✅ Confirmed successful image upload and storage path construction
+6. ✅ Implemented avatar deletion functionality with proper path extraction
+7. ✅ Fixed TypeScript errors in profile update operations
+8. ✅ Implemented and tested avatar replacement with old file cleanup
+
+## Remaining Tasks
+1. [x] Complete implementation of avatar deletion functionality
+2. [x] Test avatar replacement (updating existing avatar)
+3. [ ] Verify mobile responsiveness of avatar components
+4. [ ] Add remaining storage policies (INSERT, DELETE) for better security
+5. [ ] Perform cross-browser testing of full avatar functionality

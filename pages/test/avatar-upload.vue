@@ -1,20 +1,65 @@
 <template>
   <div class="p-4 space-y-8">
-    <h1 class="text-xl font-bold">AvatarUpload Component Test</h1>
+    <h1 class="text-xl font-bold">Avatar Replacement Test</h1>
 
     <UCard class="max-w-md">
-      <h2 class="text-lg font-semibold mb-4">Upload Functionality Test</h2>
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold">Avatar Replacement Testing</h2>
+        <UBadge :color="testStatus.color as any">{{ testStatus.label }}</UBadge>
+      </div>
+
+      <div class="flex flex-col items-center mb-6 p-4 border rounded-lg bg-gray-50">
+        <h3 class="text-sm font-medium mb-3">Current Avatar</h3>
+        <UserAvatar :avatar-url="avatarUrl" :email="user?.email || ''" size="xl" class="mb-2" />
+        <p class="text-sm text-gray-500">{{ avatarUrl ? 'Avatar is set' : 'No avatar set' }}</p>
+      </div>
+
+      <div class="mb-6">
+        <h3 class="text-sm font-medium mb-3">Test Steps:</h3>
+        <ul class="text-sm space-y-2">
+          <li class="flex items-start">
+            <UIcon :name="avatarHistory.length > 0 ? 'i-heroicons-check-circle' : 'i-heroicons-circle'"
+              class="mr-2 mt-0.5" :class="avatarHistory.length > 0 ? 'text-green-500' : 'text-gray-300'" />
+            <span>1. Upload an initial avatar</span>
+          </li>
+          <li class="flex items-start">
+            <UIcon :name="replacementDone ? 'i-heroicons-check-circle' : 'i-heroicons-circle'" class="mr-2 mt-0.5"
+              :class="replacementDone ? 'text-green-500' : 'text-gray-300'" />
+            <span>2. Replace the avatar with a new one</span>
+          </li>
+          <li class="flex items-start">
+            <UIcon :name="verificationDone ? 'i-heroicons-check-circle' : 'i-heroicons-circle'" class="mr-2 mt-0.5"
+              :class="verificationDone ? 'text-green-500' : 'text-gray-300'" />
+            <span>3. Verify the replacement was successful</span>
+          </li>
+        </ul>
+      </div>
 
       <AvatarUpload :avatar-url="avatarUrl" :email="user?.email || ''" @update="onAvatarUpdate" />
 
-      <div class="mt-4 pt-4 border-t">
+      <div class="mt-6 pt-4 border-t">
         <h3 class="font-medium mb-2">Test Results:</h3>
         <div class="space-y-2 text-sm">
-          <div><span class="font-medium">Current Avatar URL:</span> {{ avatarUrl || 'None' }}</div>
+          <div><span class="font-medium">Initial Avatar URL:</span> {{ initialAvatarUrl ? 'Set' : 'None' }}</div>
+          <div><span class="font-medium">Current Avatar URL:</span> {{ truncatedUrl }}</div>
+          <div><span class="font-medium">Avatar History:</span> {{ avatarHistory.length }}</div>
           <div><span class="font-medium">Last Action:</span> {{ lastAction }}</div>
           <div><span class="font-medium">Last Error:</span> {{ lastError || 'None' }}</div>
         </div>
       </div>
+
+      <template v-if="avatarHistory.length > 0">
+        <div class="mt-6 pt-4 border-t">
+          <h3 class="font-medium mb-2">History Log:</h3>
+          <div class="max-h-60 overflow-y-auto">
+            <div v-for="(entry, index) in avatarHistory" :key="index" class="text-xs p-2 mb-2 rounded"
+              :class="entry.type === 'replace' ? 'bg-blue-50' : entry.type === 'delete' ? 'bg-red-50' : 'bg-green-50'">
+              <div class="font-medium">{{ entry.timestamp.toLocaleTimeString() }}: {{ entry.action }}</div>
+              <div class="truncate">{{ entry.url || 'No URL' }}</div>
+            </div>
+          </div>
+        </div>
+      </template>
     </UCard>
   </div>
 </template>
@@ -26,10 +71,53 @@ definePageMeta({
 
 const user = useSupabaseUser()
 const client = useSupabaseClient()
-const avatarUrl = ref<string | null>(null)
-const lastAction = ref('None')
-const lastError = ref<string | null>(null)
+const toast = useToast()
 
+// Define interfaces for type checking
+interface ProfileData {
+  id: string;
+  avatar_url?: string | null;
+  email?: string;
+}
+
+// Avatar state tracking
+const avatarUrl = ref<string | undefined>(undefined)
+const initialAvatarUrl = ref<string | undefined>(undefined)
+const lastAction = ref('None')
+const lastError = ref<string | undefined>(undefined)
+const avatarHistory = ref<Array<AvatarHistoryEntry | {
+  timestamp: Date;
+  action: string;
+  url: string | null;
+  type: 'initial' | 'replace' | 'delete';
+}>>([])
+
+// Test status tracking
+const replacementDone = ref(false)
+const verificationDone = ref(false)
+
+// Computed properties for UI
+const truncatedUrl = computed(() => {
+  if (!avatarUrl.value) return 'None';
+  return avatarUrl.value.length > 50 
+    ? avatarUrl.value.substring(0, 25) + '...' + avatarUrl.value.substring(avatarUrl.value.length - 25)
+    : avatarUrl.value;
+})
+
+const testStatus = computed(() => {
+  if (!initialAvatarUrl.value) {
+    return { label: 'Not Started', color: 'gray' };
+  }
+  if (!replacementDone.value) {
+    return { label: 'In Progress', color: 'yellow' };
+  }
+  if (!verificationDone.value) {
+    return { label: 'Verifying', color: 'blue' };
+  }
+  return { label: 'Completed', color: 'green' };
+}) as unknown as { value: { label: string, color: string } }
+
+// Lifecycle
 onMounted(async () => {
   if (user.value?.id) {
     try {
@@ -37,144 +125,105 @@ onMounted(async () => {
       const { data, error } = await client
         .from('profiles')
         .select('avatar_url')
-        .eq('id', user.value.id)
+        .eq('id', user.value?.id)
         .single()
       
       if (error) throw error
       
-      avatarUrl.value = data?.avatar_url || null
-      lastAction.value = 'Loaded initial avatar'
+      const profileData = data as ProfileData
+      avatarUrl.value = profileData?.avatar_url || undefined
+      
+      if (avatarUrl.value) {
+        initialAvatarUrl.value = avatarUrl.value
+        lastAction.value = 'Loaded existing avatar'
+        avatarHistory.value.push({
+          timestamp: new Date(),
+          action: 'Loaded existing avatar',
+          url: avatarUrl.value,
+          type: 'initial'
+        })
+      } else {
+        lastAction.value = 'No initial avatar found'
+      }
     } catch (err: any) {
       lastError.value = err.message
+      console.error('Error loading avatar:', err)
     }
   }
 })
 
-async function onFileSelected(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (!input.files || !input.files.length) return
-  
-  const file = input.files[0]
-  if (!file) return
-  
-  // Validate file type
-  if (!file.type.match(/image\/(jpeg|jpg|png|gif)/)) {
-    toast.add({
-      title: 'Invalid File',
-      description: 'Please select a valid image file (JPEG, PNG, or GIF)',
-      color: 'red'
-    })
-    return
-  }
-  
-  // Validate file size (max 5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    toast.add({
-      title: 'File Too Large',
-      description: 'Image must be smaller than 5MB',
-      color: 'red'
-    })
-    return
-  }
-  
-  uploading.value = true
-  
-  try {
-    // First, ensure the profile exists
-    await ensureProfileExists()
-    
-    // Create a simple unique filename without folders
-    const fileExt = file.name.split('.').pop()
-    const fileName = `avatar-${user.value?.id}-${Date.now()}.${fileExt}`
-    
-    console.log('Uploading to path:', fileName)
-    
-    // Upload file to Supabase Storage with simple options
-    const { data: uploadData, error: uploadError } = await client.storage
-      .from('avatars')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: true
-      })
-    
-    if (uploadError) throw uploadError
-    
-    console.log('Upload successful:', uploadData)
-    
-    // Get public URL
-    const { data: publicURL } = client.storage
-      .from('avatars')
-      .getPublicUrl(fileName)
-    
-    if (!publicURL) throw new Error('Failed to get public URL')
-    
-    console.log('Public URL obtained:', publicURL.publicUrl)
-    
-    // Update profile with new avatar URL
-    const { error: updateError } = await client
-      .from('profiles')
-      .update({ 
-        avatar_url: publicURL.publicUrl,
-        updated_at: new Date()
-      })
-      .eq('id', user.value?.id)
-    
-    if (updateError) throw updateError
-    
-    // Emit event to parent
-    emit('update', publicURL.publicUrl)
-    
-    toast.add({
-      title: 'Success',
-      description: 'Profile photo updated',
-      color: 'green'
-    })
-  } catch (error: any) {
-    console.error('Avatar upload error:', error)
-    toast.add({
-      title: 'Upload Failed',
-      description: error.message || 'Failed to upload avatar',
-      color: 'red'
-    })
-  } finally {
-    uploading.value = false
-    if (fileInput.value) fileInput.value.value = ''
-  }
-}
-
-// Helper function to ensure profile exists before updating
-async function ensureProfileExists() {
-  if (!user.value?.id) throw new Error('User not authenticated')
-  
-  // First check if profile exists
-  const { data, error } = await client
-    .from('profiles')
-    .select('id')
-    .eq('id', user.value.id)
-  
-  console.log('Profile check:', { data, error })
-  
-  // If no profile or error, try to create one
-  if (error || !data || data.length === 0) {
-    console.log('Creating profile for user:', user.value.id)
-    
-    const { error: insertError } = await client
-      .from('profiles')
-      .insert({
-        id: user.value.id,
-        email: user.value.email,
-        created_at: new Date(),
-        updated_at: new Date()
-      })
-    
-    if (insertError) throw insertError
-    
-    console.log('Profile created successfully')
-  }
-}
-
-function onAvatarUpdate(newAvatarUrl: string | null) {
+function onAvatarUpdate(newAvatarUrl: string | undefined) {
+  const oldUrl = avatarUrl.value
   avatarUrl.value = newAvatarUrl
-  lastAction.value = newAvatarUrl ? 'Avatar uploaded' : 'Avatar deleted'
+  
+  // Track avatar changes for the test
+  if (newAvatarUrl === undefined) {
+    // Avatar was deleted
+    lastAction.value = 'Avatar deleted'
+    avatarHistory.value.push({
+      timestamp: new Date(),
+      action: 'Avatar deleted',
+      url: undefined as unknown as string | null,
+      type: 'delete'
+    })
+    // Reset test state if avatar was deleted
+    replacementDone.value = false
+    verificationDone.value = false
+  } else if (oldUrl && newAvatarUrl && oldUrl !== newAvatarUrl) {
+    // Avatar was replaced (this is what we're testing)
+    lastAction.value = 'Avatar replaced'
+    avatarHistory.value.push({
+      timestamp: new Date(),
+      action: 'Avatar replaced',
+      url: newAvatarUrl,
+      type: 'replace'
+    })
+    replacementDone.value = true
+    
+    // Verify replacement was successful
+    setTimeout(async () => {
+      try {
+        // Double-check the profile record
+        const { data, error } = await client
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', user.value?.id)
+          .single()
+        
+        if (error) throw error
+        
+        const profileData = data as ProfileData
+        if (profileData?.avatar_url === newAvatarUrl) {
+          verificationDone.value = true
+          avatarHistory.value.push({
+            timestamp: new Date(),
+            action: 'Replacement verified in database',
+            url: newAvatarUrl,
+            type: 'replace'
+          })
+          toast.add({
+            title: 'Test Completed',
+            description: 'Avatar replacement test successful',
+            color: 'green'
+          })
+        } else {
+          throw new Error('Avatar URL mismatch in database')
+        }
+      } catch (err: any) {
+        lastError.value = err.message
+        console.error('Verification error:', err)
+      }
+    }, 1000)
+  } else if (!oldUrl && newAvatarUrl) {
+    // Initial avatar upload
+    lastAction.value = 'Initial avatar uploaded'
+    initialAvatarUrl.value = newAvatarUrl
+    avatarHistory.value.push({
+      timestamp: new Date(),
+      action: 'Initial avatar uploaded',
+      url: newAvatarUrl,
+      type: 'initial'
+    })
+  }
 }
 </script>
