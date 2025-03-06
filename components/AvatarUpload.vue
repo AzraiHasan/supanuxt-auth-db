@@ -1,10 +1,10 @@
 <!-- components/AvatarUpload.vue -->
 <template>
   <div>
-    <div class="flex items-center space-x-4">
+    <div class="flex flex-col sm:flex-row items-center sm:space-x-4 space-y-3 sm:space-y-0">
       <UserAvatar :avatar-url="avatarUrl" :email="email" size="lg" />
 
-      <div class="flex flex-col space-y-2">
+      <div class="flex flex-row sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2">
         <UButton size="sm" @click="openFileDialog" :loading="uploading" icon="i-heroicons-camera">
           {{ avatarUrl ? 'Change Photo' : 'Upload Photo' }}
         </UButton>
@@ -178,7 +178,7 @@ async function onFileSelected(event: Event) {
     // Create a unique file path
     const fileExt = file.name.split('.').pop()
     const fileName = `${user.value?.id}-${Date.now()}.${fileExt}`
-    const filePath = `avatars/${fileName}`
+    const filePath = `${user.value?.id}/${fileName}`
     
     // Upload file to Supabase Storage
     const { error: uploadError } = await client.storage
@@ -237,9 +237,9 @@ async function deleteAvatar() {
   try {
     console.log('Starting avatar deletion process')
     
-    // Extract the filename from the URL
-    const match = props.avatarUrl.match(/\/avatars\/(.+)$/) || 
-                 props.avatarUrl.match(/\/storage\/v1\/object\/public\/avatars\/(.+)$/);
+    // Extract the complete path including user ID folder from the URL
+const match = props.avatarUrl.match(/\/avatars\/(.+)$/) || 
+             props.avatarUrl.match(/\/storage\/v1\/object\/public\/avatars\/(.+)$/);
     
     if (!match || !match[1]) {
       throw new Error('Could not extract file path from avatar URL')

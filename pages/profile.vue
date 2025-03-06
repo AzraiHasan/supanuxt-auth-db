@@ -26,17 +26,17 @@
         </div>
 
         <div class="grid gap-2">
-          <div class="grid grid-cols-3 py-2 border-b border-gray-100">
-            <span class="text-gray-500">Full Name</span>
-            <span class="col-span-2">{{ profileData.full_name || 'Not set' }}</span>
+          <div class="grid grid-cols-1 md:grid-cols-3 py-2 border-b border-gray-100">
+            <span class="text-gray-500 font-medium md:font-normal">Full Name</span>
+            <span class="col-span-1 md:col-span-2">{{ profileData.full_name || 'Not set' }}</span>
           </div>
-          <div class="grid grid-cols-3 py-2 border-b border-gray-100">
-            <span class="text-gray-500">Username</span>
-            <span class="col-span-2">{{ profileData.username || 'Not set' }}</span>
+          <div class="grid grid-cols-1 md:grid-cols-3 py-2 border-b border-gray-100">
+            <span class="text-gray-500 font-medium md:font-normal">Username</span>
+            <span class="col-span-1 md:col-span-2">{{ profileData.username || 'Not set' }}</span>
           </div>
-          <div class="grid grid-cols-3 py-2 border-b border-gray-100">
-            <span class="text-gray-500">Website</span>
-            <span class="col-span-2">{{ profileData.website || 'Not set' }}</span>
+          <div class="grid grid-cols-1 md:grid-cols-3 py-2 border-b border-gray-100">
+            <span class="text-gray-500 font-medium md:font-normal">Website</span>
+            <span class="col-span-1 md:col-span-2">{{ profileData.website || 'Not set' }}</span>
           </div>
         </div>
 
@@ -87,14 +87,57 @@ definePageMeta({
   middleware: ['auth']
 })
 
-const client = useSupabaseClient()
+// Define database schema types for TypeScript
+interface ProfileRow {
+  id: string;
+  email?: string | null;
+  full_name?: string | null;
+  username?: string | null;
+  website?: string | null;
+  avatar_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface ProfileInsert {
+  id: string;
+  email?: string | null;
+  full_name?: string | null;
+  username?: string | null;
+  website?: string | null;
+  avatar_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface ProfileUpdate {
+  full_name?: string | null;
+  username?: string | null;
+  website?: string | null;
+  avatar_url?: string | null;
+  updated_at?: string;
+}
+
+interface Database {
+  public: {
+    Tables: {
+      profiles: {
+        Row: ProfileRow;
+        Insert: ProfileInsert;
+        Update: ProfileUpdate;
+      }
+    }
+  }
+}
+
+const client = useSupabaseClient<Database>()
 const user = useSupabaseUser()
 const toast = useToast()
 
 const loading = ref(true)
 const updating = ref(false)
 const isEditing = ref(false)
-const profileData = ref({
+const profileData = ref<ProfileRow>({
   id: '',
   full_name: '',
   username: '',
@@ -159,8 +202,10 @@ async function createProfile() {
       .from('profiles')
       .insert({
         id: user.value.id,
-        email: user.value.email
-      })
+        email: user.value.email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as ProfileInsert)
       .select()
       .single()
 
@@ -202,8 +247,8 @@ async function updateProfile() {
         full_name: form.value.full_name,
         username: form.value.username,
         website: form.value.website,
-        updated_at: new Date()
-      })
+        updated_at: new Date().toISOString()
+      } as ProfileUpdate)
       .eq('id', user.value.id)
       .select()
       .single()
