@@ -141,3 +141,98 @@ it('validates file type and size on selection', async () => {
     title: 'File Too Large'
   }))
 })
+
+// Test upload success handling
+it('handles successful file upload and emits update event', async () => {
+  // Mock Supabase client for successful upload
+  mockSupabaseClient.storage.from.mockReturnValue({
+    upload: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    getPublicUrl: vi.fn().mockReturnValue({ 
+      data: { publicUrl: 'https://example.com/avatar.jpg' } 
+    }),
+    remove: vi.fn().mockResolvedValue({ data: null, error: null })
+  })
+  
+  mockSupabaseClient.from.mockReturnValue({
+    update: vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null })
+    })
+  })
+  
+  // Mount component
+  const wrapper = mount(AvatarUpload)
+  
+  // Create a valid file
+  const file = new File(['image content'], 'test.jpg', { type: 'image/jpeg' })
+  
+  // Simulate file selection
+  const fileInput = wrapper.find('input[type="file"]')
+  Object.defineProperty(fileInput.element, 'files', {
+    value: [file]
+  })
+  await fileInput.trigger('change')
+  
+  // Wait for promises to resolve
+  await vi.runAllTimers()
+  
+  // Check success toast was shown
+  expect(mockToast.add).toHaveBeenCalledWith(expect.objectContaining({
+    title: 'Success',
+    description: 'Profile photo updated',
+    color: 'green'
+  }))
+  
+  // Check update event was emitted with the URL
+  const emitted = wrapper.emitted('update')
+  expect(emitted).toBeTruthy()
+  if (emitted) {
+    expect(emitted[0]).toEqual(['https://example.com/avatar.jpg'])
+  }
+})
+
+// Test avatar deletion functionality
+it('deletes avatar when confirmation is confirmed', async () => {
+  // Mock Supabase client for successful deletion
+  mockSupabaseClient.storage.from.mockReturnValue({
+    remove: vi.fn().mockResolvedValue({ data: {}, error: null })
+  })
+  
+  mockSupabaseClient.from.mockReturnValue({
+    update: vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null })
+    })
+  })
+  
+  // Mount component with existing avatar
+  const wrapper = mount(AvatarUpload, {
+    props: {
+      avatarUrl: 'https://example.com/avatars/test-user-id/avatar.jpg'
+    }
+  })
+  
+  // Find the Remove Photo button
+  const removeButton = wrapper.find('button[icon="i-heroicons-trash"]')
+  await removeButton.trigger('click')
+  
+  // Modal should be visible now
+  // Find the Delete button in the modal
+  const deleteButton = wrapper.find('button[color="red"]')
+  await deleteButton.trigger('click')
+  
+  // Wait for promises to resolve
+  await vi.runAllTimers()
+  
+  // Check success toast was shown
+  expect(mockToast.add).toHaveBeenCalledWith(expect.objectContaining({
+    title: 'Success',
+    description: 'Profile photo removed',
+    color: 'green'
+  }))
+  
+  // Check update event was emitted with null
+  const emitted = wrapper.emitted('update')
+  expect(emitted).toBeTruthy()
+  if (emitted) {
+    expect(emitted[0]).toEqual([null])
+  }
+})
