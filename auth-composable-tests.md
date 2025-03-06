@@ -13,13 +13,23 @@ This document outlines the testing strategy for the `useAuth` composable functio
 ### Test Configuration
 ```typescript
 // tests/composables/useAuth.test.ts
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { useAuth } from '@/composables/useAuth'
+import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { mockNuxtImport, mockSupabaseClient } from '../utils/mocks'
 
-// Mock Nuxt-specific composables
-vi.mock('#imports', async () => {
+// Create the mock objects first
+export const mockSupabaseClient = {
+  auth: {
+    signInWithPassword: vi.fn(),
+    signUp: vi.fn(),
+    resetPasswordForEmail: vi.fn(),
+    updateUser: vi.fn(),
+    signOut: vi.fn(),
+    refreshSession: vi.fn()
+  }
+}
+
+// IMPORTANT: Mock the imports BEFORE importing useAuth
+vi.mock('#imports', () => {
   return {
     useSupabaseClient: () => mockSupabaseClient,
     useSupabaseUser: () => ({ value: { id: 'test-user-id', email: 'test@example.com' } }),
@@ -29,6 +39,9 @@ vi.mock('#imports', async () => {
     watch: vi.fn()
   }
 })
+
+// Import useAuth after setting up mocks
+import { useAuth } from '@/composables/useAuth'
 
 describe('useAuth', () => {
   beforeEach(() => {
@@ -42,33 +55,11 @@ describe('useAuth', () => {
     mockSupabaseClient.auth.resetPasswordForEmail.mockReset()
     mockSupabaseClient.auth.updateUser.mockReset()
     mockSupabaseClient.auth.signOut.mockReset()
+    mockSupabaseClient.auth.refreshSession.mockReset()
   })
 
   // Tests will go here
 })
-```
-
-### Mock Utilities
-```typescript
-// tests/utils/mocks.ts
-import { vi } from 'vitest'
-
-// Mock Supabase client
-export const mockSupabaseClient = {
-  auth: {
-    signInWithPassword: vi.fn(),
-    signUp: vi.fn(),
-    resetPasswordForEmail: vi.fn(),
-    updateUser: vi.fn(),
-    signOut: vi.fn(),
-    refreshSession: vi.fn()
-  }
-}
-
-// Helper to mock Nuxt imports for testing
-export function mockNuxtImport(importName, mockImplementation) {
-  return vi.mock(importName, () => mockImplementation)
-}
 ```
 
 ## Test Cases

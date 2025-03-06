@@ -12,7 +12,6 @@ export const mockSupabaseClient = {
   }
 }
 
-// Helper to mock Nuxt imports for testing
 export function mockNuxtImport(importName: string, mockImplementation: any) {
   return vi.mock(importName, () => mockImplementation)
 }
