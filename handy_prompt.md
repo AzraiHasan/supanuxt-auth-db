@@ -1,5 +1,5 @@
-analyze the attached repo. let's continue as per the `development_status.md`, accordingly.
+analyze the attached repo. let's continue as per the `auth_composable_tests.md`, accordingly.
 
-please update the 'Updated Supabase Authentication Test Cases' file
+please update the `auth_composable_tests.md` file
 
 i've implemented the changes and found no errors.
