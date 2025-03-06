@@ -84,7 +84,7 @@
   - Server error handling ✅
   - Network error handling ✅
 
-## 8. Testing ✅
+## 8. Testing ⏳
 
 - Manual testing plan ✅
   - Registration flow ✅
@@ -97,7 +97,7 @@
   - Avatar management functionality ✅
 
 - Unit/Integration tests ⏳
-  - Auth composable tests
+  - Auth composable tests ✅
   - Component tests
   - Middleware tests
 
