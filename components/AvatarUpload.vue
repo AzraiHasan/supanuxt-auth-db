@@ -47,7 +47,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineProps, defineEmits } from 'vue'
+import { ref } from 'vue'
+
+// Define interface for type checking locally
+interface ProfileData {
+  id: string
+  email?: string
+  avatar_url?: string | null
+  created_at?: string
+  updated_at?: string
+}
 
 const props = defineProps({
   avatarUrl: {
@@ -60,7 +69,9 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update'])
+const emit = defineEmits<{
+  (e: 'update', url: string | null): void
+}>()
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
@@ -128,11 +139,11 @@ async function onFileSelected(event: Event) {
     if (!publicURL) throw new Error('Failed to get public URL')
     
     // Update profile with new avatar URL
-    const { error: updateError } = await client
-      .from('profiles')
+    const { error: updateError } = await (client
+      .from('profiles') as any)
       .update({ 
         avatar_url: publicURL.publicUrl,
-        updated_at: new Date()
+        updated_at: new Date().toISOString()
       })
       .eq('id', user.value?.id)
     
@@ -168,28 +179,45 @@ async function deleteAvatar() {
   deleting.value = true
   
   try {
-    // Extract file path from URL
-    const url = new URL(props.avatarUrl)
-    const pathSegments = url.pathname.split('/')
-    const filePath = pathSegments.slice(pathSegments.indexOf('avatars')).join('/')
+    console.log('Starting avatar deletion process')
     
-    // Delete file from storage
-    const { error: deleteError } = await client.storage
+    // Extract the filename from the URL
+    const match = props.avatarUrl.match(/\/avatars\/(.+)$/) || 
+                 props.avatarUrl.match(/\/storage\/v1\/object\/public\/avatars\/(.+)$/);
+    
+    if (!match || !match[1]) {
+      throw new Error('Could not extract file path from avatar URL')
+    }
+    
+    // Full path as used during upload
+    const filePath = match[1]
+    console.log('Extracted path:', filePath)
+    
+    // Delete the file using the path
+    console.log('Attempting to delete file:', filePath)
+    const { data: deleteData, error: deleteError } = await client.storage
       .from('avatars')
       .remove([filePath])
     
-    if (deleteError) throw deleteError
+    console.log('Delete response:', { data: deleteData, error: deleteError })
+    
+    if (deleteError) {
+      throw deleteError
+    }
     
     // Update profile
-    const { error: updateError } = await client
-      .from('profiles')
-      .update({ 
+    console.log('Updating profile to remove avatar_url')
+    const { error: updateError } = await (client
+      .from('profiles') as any)
+      .update({
         avatar_url: null,
-        updated_at: new Date()
+        updated_at: new Date().toISOString()
       })
-      .eq('id', user.value.id)
+      .eq('id', user.value?.id)
     
-    if (updateError) throw updateError
+    if (updateError) {
+      throw updateError
+    }
     
     // Emit event to parent
     emit('update', null)
@@ -209,6 +237,37 @@ async function deleteAvatar() {
   } finally {
     deleting.value = false
     showDeleteModal.value = false
+  }
+}
+
+// Helper function to ensure profile exists before updating
+async function ensureProfileExists() {
+  if (!user.value?.id) throw new Error('User not authenticated')
+  
+  // First check if profile exists
+  const { data, error } = await (client
+    .from('profiles') as any)
+    .select('id')
+    .eq('id', user.value.id)
+  
+  console.log('Profile check:', { data, error })
+  
+  // If no profile or error, try to create one
+  if (error || !data || data.length === 0) {
+    console.log('Creating profile for user:', user.value.id)
+    
+    const { error: insertError } = await (client
+      .from('profiles') as any)
+      .insert({
+        id: user.value.id,
+        email: user.value.email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+    
+    if (insertError) throw insertError
+    
+    console.log('Profile created successfully')
   }
 }
 </script>
