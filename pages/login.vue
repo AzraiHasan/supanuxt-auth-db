@@ -1,9 +1,13 @@
-<!-- pages/login.vue -->
+<!-- pages/login.vue with rate limiting -->
 <template>
   <div class="flex min-h-screen justify-center items-center">
     <UCard class="w-full max-w-md">
       <div v-if="authError" class="mb-4 p-3 bg-red-100 text-red-800 rounded text-sm">
         {{ authError }}
+      </div>
+
+      <div v-if="isLoginRateLimited" class="mb-4 p-3 bg-yellow-100 text-yellow-800 rounded text-sm">
+        Too many login attempts. Please try again in {{ Math.ceil(timeUntilReset / 1000) }} seconds.
       </div>
 
       <form @submit.prevent="onLogin">
@@ -22,7 +26,7 @@
         </div>
 
         <div class="mt-4">
-          <UButton type="submit" block :loading="loading">Sign In</UButton>
+          <UButton type="submit" block :loading="loading" :disabled="isLoginRateLimited">Sign In</UButton>
         </div>
       </form>
 
@@ -51,6 +55,23 @@ const passwordError = ref('')
 const authError = ref('')
 
 const { login, loading, error: loginError } = useAuth()
+
+// Rate limiting implementation
+const rateLimiter = useRateLimiter({ maxAttempts: 5, windowMs: 60000 })
+const isLoginRateLimited = ref(false)
+const timeUntilReset = ref(0)
+
+// Check rate limit status
+function updateRateLimitStatus() {
+  const ipKey = 'login_' + (useRequestHeaders(['x-forwarded-for'])['x-forwarded-for'] || 'default')
+  isLoginRateLimited.value = rateLimiter.isRateLimited(ipKey)
+  timeUntilReset.value = rateLimiter.getTimeUntilReset(ipKey)
+}
+
+// Update rate limit status on component mount
+onMounted(() => {
+  updateRateLimitStatus()
+})
 
 // Watch for auth errors from the composable
 watch(loginError, (value) => {
@@ -85,6 +106,12 @@ function validateForm() {
 }
 
 async function onLogin() {
+  // Check rate limiting before attempting login
+  updateRateLimitStatus()
+  if (isLoginRateLimited.value) {
+    return
+  }
+  
   if (!validateForm()) return
   
   try {
@@ -96,10 +123,29 @@ async function onLogin() {
       navigateTo('/dashboard')
     } else {
       console.error('Login failed:', result.error)
+      // Update rate limit status after a failed attempt
+      updateRateLimitStatus()
     }
   } catch (error: any) {
     console.error('Error during login:', error)
     authError.value = error.message || 'An unexpected error occurred'
+    // Update rate limit status after an error
+    updateRateLimitStatus()
   }
 }
+
+// Start timer to update remaining time until reset
+const updateTimer = setInterval(() => {
+  if (isLoginRateLimited.value) {
+    updateRateLimitStatus()
+    if (!isLoginRateLimited.value) {
+      clearInterval(updateTimer)
+    }
+  }
+}, 1000)
+
+// Clean up timer on component unmount
+onBeforeUnmount(() => {
+  clearInterval(updateTimer)
+})
 </script>
