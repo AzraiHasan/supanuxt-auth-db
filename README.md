@@ -48,6 +48,8 @@ git clone https://github.com/azraihasan/nuxt-supabase-auth.git
 cd nuxt-supabase-auth
 
 # Install dependencies
+bun install
+# or
 npm install
 # or
 yarn install
@@ -109,6 +111,8 @@ Replace the values with your Supabase project URL and anon key.
 ### 4. Start Development Server
 
 ```bash
+bun dev
+# or
 npm run dev
 # or
 yarn dev
@@ -152,6 +156,8 @@ The template includes comprehensive tests for components, pages, and composables
 
 ```bash
 # Run tests
+npx vitest run # recommended
+# or
 npm run test
 # or
 yarn test
