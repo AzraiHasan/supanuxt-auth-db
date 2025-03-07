@@ -7,7 +7,7 @@ export default defineVitestConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
-    exclude: ['**/node_modules/**', '**/pages/**'],
+    exclude: ['**/node_modules/**'],
     deps: {
       optimizer: {
         web: {

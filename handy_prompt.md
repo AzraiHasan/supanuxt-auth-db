@@ -1,6 +1,6 @@
-analyze the attached repo. let's continue as per the `Component Tests TODOs`, accordingly.
+analyze the attached repo. let's continue as per the `component_tests.md`, accordingly.
 
-please update the `Component Tests TODOs` file
+please update the `component_tests.md` file
 
 i've implemented the changes and found no errors.
 
