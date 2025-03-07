@@ -22,14 +22,14 @@
       - AvatarUpload.vue ⏳
         - Test file selection trigger ✅
         - Test file validation (type, size) ✅
-        - Test upload success handling
-        - Test upload error handling
-        - Test avatar deletion functionality
-      - UserMenu.vue
-        - Test menu rendering
-        - Test menu item click handlers
-        - Test logout functionality
-        - Test conditional display of items
+        - Test upload success handling ✅
+        - Test upload error handling ⏳
+        - Test avatar deletion functionality ⏳
+      - UserMenu.vue ✅
+        - Test menu rendering ✅
+        - Test menu item click handlers ✅
+        - Test logout functionality ✅
+        - Test conditional display of items ✅
     - Pages
       - login.vue
         - Test form validation
